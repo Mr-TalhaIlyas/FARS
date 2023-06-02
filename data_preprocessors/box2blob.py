@@ -29,7 +29,8 @@ mpl.rcParams['figure.dpi']=300
 from fmutils import fmutils as fmu
 from segment_anything import sam_model_registry, SamPredictor
 
-from utils import draw_boxes, get_info_from_xml, assign_classes, create_data_dir_tree
+from utils import (draw_boxes, get_info_from_xml, assign_classes,
+                   create_data_dir_tree, mask_to_bounding_boxes, get_sem_bdr)
 
 from gray2color import gray2color
 
@@ -60,8 +61,9 @@ processed_data_dir = '/home/user01/data/talha/'
 machines = ['HCM', 'LCM']
 
 save_visulizations = True
+write_updated_xml = True
 
-create_data_dir_tree(processed_data_dir, visualize_dir=save_visulizations)
+create_data_dir_tree(processed_data_dir, save_visulizations, write_updated_xml)
 #%%
 for machine in machines:
     img_paths = fmu.get_all_files(f"/home/user01/data/talha/Extracted/{machine}/")
@@ -91,6 +93,7 @@ for machine in machines:
                 processed_file[0] = os.path.sep
             processed_img = os.path.join(*processed_file, 'images', f'{file_name}.png')
             processed_lbl = os.path.join(*processed_file, 'labels', f'{file_name}.png')
+            processed_xml = os.path.join(*processed_file, 'xmls', f'{file_name}.xml')
             
             '''Start reading and processing files and annotations'''
             
@@ -121,15 +124,22 @@ for machine in machines:
             # convert to semantic
             sem_seg = assign_classes(bin_seg, coords, det_classes, class_dict)
             
+            # write updated tight bouding boxes.
+            if write_updated_xml:
+                xml = mask_to_bounding_boxes(sem_seg, class_dict, file_name, sem_seg.shape[1], sem_seg.shape[0], depth=3)
+    
+                with open(processed_xml, 'w') as file:
+                    file.write(xml)
+                
             shutil.copy2(Path(img_paths[i]), Path(processed_img))
             cv2.imwrite(str(Path(processed_lbl)), sem_seg)
             
             if save_visulizations:
-                clr_sem_seg = g2c(sem_seg)
+                # clr_sem_seg = g2c(sem_seg)
                 confidences = np.zeros(det_classes.shape)
                 op, _, _, _ = draw_boxes(image, confidences, coords, det_classes, list(class_dict.keys()))
-                
-                x = cv2.addWeighted(op, 0.6, clr_sem_seg, 0.4, 1)
+                x = get_sem_bdr(sem_seg, op)
+                # x = cv2.addWeighted(op, 0.6, clr_sem_seg, 0.4, 1)
                 
                 cv2.imwrite(str(Path(processed_data_dir) / 'processed' / 'visualize' / f'{machine}_{file_name}.png'),
                             cv2.cvtColor(x, cv2.COLOR_BGR2RGB))
