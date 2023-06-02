@@ -1,0 +1,118 @@
+# Configuration file for trinag model and hyperparameter settings
+# of crop and weed dataset
+
+#'0,1,2,3'
+gpus_to_use: '0'
+DPI: 300
+LOG_WANDB:  False
+
+project_name: 'UDA_BEAN'
+#'#'bean_aug_advent_carbonnier_new_data'
+experiment_name: 'bean_aug_advent_carbonnier_nd8_sgd_P03'
+
+log_directory: "/home/user01/data/talha/bean_uda/logs/"
+checkpoint_path: "/home/user01/data/talha/bean_uda/chkpts/"
+use_ocr: True
+
+# Data loader parameters
+
+src_data_dir: "/home/user01/data/talha/bean_uda/datasets/src_trg/"
+trg_data_dir: "/home/user01/data/talha/bean_uda/datasets/farms/c/"
+
+# add sub dirs inside of train/val and test
+sub_directories: ['images/images/', 'masks/masks/']
+Normalize_data: True
+Shuffle_data: True
+
+SRC_DOMAIN_LBL: 0
+TRG_DOMAIN_LBL: 1
+
+pin_memory: True
+num_workers: 6
+num_classes: 3
+img_height: 512
+img_width: 512
+# 4 means output of network is 4 times downsampled than input.
+output_stride: 4
+input_channels: 3
+label_smoothing: 0.0
+batch_size: 1
+WEIGHT_DECAY: 0.00005
+AUX_LOSS_Weights: 0.4
+LAMBDA_ADV_MAIN: 0.001
+LAMBDA_ADV_AUX: 0.0002
+# only for training data
+Augment_data: True
+# Augmentation Prbabilities
+# shoudl be same legth
+step_epoch:    [0]
+#, 10, 15, 20, 25, 30]
+
+geometric_aug: [0.1]
+#, 0.1, 0.2, 0.4, 0.3, 0.3]
+noise_aug:     [0.1]
+#, 0.1, 0.2, 0.2, 0.2, 0.2]
+
+# Regularization SD 0.5 LS 1e-2
+stochastic_drop_path: 3e-1
+SD_mode: 'batch'
+layer_scaling_val: 1e-5
+
+# learning rate
+learning_rate: 0.01
+learning_rate_d: 0.0001
+lr_schedule: 'cos'
+lr_schedule_d: 'poly'
+epochs: 100 
+warmup_epochs: 1
+# one of 'batch_norm' or 'sync_bn' or 'layer_norm'
+norm_typ: 'sync_bn'
+BN_MOM: 0.9
+SyncBN_MOM: 3e-4
+
+# MODEL
+embed_dims: [96, 192, 384, 768]
+ffn_ratios: [4, 4, 4, 4]
+depths: [3, 5, 9, 3]
+dec_channels: 512
+# Hamburger Parameters
+ham_channels: 512
+
+put_cheese: True
+
+DUAL: False
+SPATIAL: TRUE
+RAND_INIT: True
+
+MD_S: 1
+MD_D: 512
+MD_R: 64
+
+TRAIN_STEPS: 6
+EVAL_STEPS: 6
+
+INV_T: 1
+BETA: 0.1
+Eta: 0.9
+
+# OCR Parameters
+OCR_CH: 512
+OCR_QKV_CH: 256
+
+# Entropy
+ita: 2.0
+charbonnier: True
+reduce_dim: False
+
+classes:
+  [
+    "background",
+    "bean",
+    "weed",
+  ]
+
+pallet:  
+        - [0, 0, 0]
+        - [204,0, 102]
+        - [102,0, 204]
+        - [255,0, 0]
