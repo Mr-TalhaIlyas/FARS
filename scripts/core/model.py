@@ -9,7 +9,7 @@ import torch.nn as nn
 from core.backbone import MSCANet
 from core.decoder import DecoderHead, HamDecoder, OCRDecoder
 
-from core.losses import FocalLoss, Entropy
+from core.losses import FocalLoss, Entropy, LovaszSoftmax
 
 class UHDNext(nn.Module):
     '''Different Decoder then SegNext'''
@@ -227,7 +227,8 @@ class MaxViT_OCR(nn.Module):
                               config=config, enc_embed_dims=embed_dims)
         # define loss here for balance load accross GPUs
         self.criterion = FocalLoss()
-        self.aux_criterion = nn.CrossEntropyLoss(ignore_index=-100)
+        # self.aux_criterion = nn.CrossEntropyLoss(ignore_index=-100)
+        self.aux_criterion = LovaszSoftmax()
 
     def forward(self, x, target=None):
 

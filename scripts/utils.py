@@ -3,7 +3,7 @@ with open('config.yaml') as fh:
     config = yaml.load(fh, Loader=yaml.FullLoader)
 import math
 
-import cv2, os, imgviz
+import cv2, os, imgviz, random
 from tqdm import tqdm
 import numpy as np
 from termcolor import cprint
@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from core.losses import Entropy
 from data.utils import (images_transform, masks_transform, torch_imgresizer,
                         torch_resizer)
-
+from fda.fda_torch import DomainAdapter
 from gray2color import gray2color
 g2c = lambda x : gray2color(x, use_pallet='pannuke')
 
@@ -209,6 +209,7 @@ class AdvTrain(object):
         self.src_lbl = 0
         self.trg_lbl = 1
         self.prob2ent = Entropy(config['ita'], config['charbonnier'], config['reduce_dim'])
+        self.da = DomainAdapter(L=config['L'], space=config['space'])
         # self.prob2ent = nn.Softmax(dim=1)
 
 
@@ -227,9 +228,18 @@ class AdvTrain(object):
             param.requires_grad = True
 
     def training_step(self, src_batch, trg_batch):
-        img_batch = images_transform(src_batch['img'])
+        simg_batch = images_transform(src_batch['img'])
+        timg_batch = images_transform(trg_batch['img'])
         lbl_batch = torch_resizer(masks_transform(src_batch['lbl']))
-
+        
+        # we will transfer HCM stains texture to LCM stains.
+        # timg_batch = self.da.apply_fda(timg_batch, simg_batch)
+        # simg_batch = self.da.apply_fda(simg_batch, timg_batch)
+        if np.random.randint(0, 100) % 2 == 0: # randomly when even
+            simg_batch = self.da.apply_fda(simg_batch, timg_batch)
+        else: # when odd
+            timg_batch = self.da.apply_fda(timg_batch, simg_batch)
+        
         self.model.zero_grad()
         self.disc.zero_grad()
         self.aux_disc.zero_grad()
@@ -241,16 +251,15 @@ class AdvTrain(object):
         self.freeze(self.disc)
         self.freeze(self.aux_disc)
 
-        src_loss, src_preds = self.model.forward(img_batch, target=lbl_batch) 
+        src_loss, src_preds = self.model.forward(simg_batch, target=lbl_batch) 
 
         loss = src_loss['loss'] + config['AUX_LOSS_Weights'] * src_loss['aux_loss']
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             loss = loss.mean()
         loss.backward()
 
-        img_batch = images_transform(trg_batch['img'])
         # lbl_batch = torch_resizer(masks_transform(trg_batch['lbl']))
-        _, trg_preds = self.model.forward(img_batch, target=None)
+        _, trg_preds = self.model.forward(timg_batch, target=None)
         # probability -> entropy (Ix)
         ent = self.prob2ent(trg_preds['out'])
         aux_ent = self.prob2ent(trg_preds['aux_out'])
@@ -272,25 +281,25 @@ class AdvTrain(object):
 
         # with source data
         disc_loss = self.disc(self.prob2ent(src_preds['out'].detach()),
-                              target = self.src_lbl) / 2 # for slowing learning speed
+                              target = self.src_lbl) / 4 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             disc_loss = disc_loss.mean()
         disc_loss.backward()
 
         aux_disc_loss = self.aux_disc(self.prob2ent(src_preds['aux_out'].detach()),
-                                      target = self.src_lbl) / 2 # for slowing learning speed
+                                      target = self.src_lbl) / 4 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             aux_disc_loss = aux_disc_loss.mean()
         aux_disc_loss.backward()
 
         # with target data
         disc_loss = self.disc(self.prob2ent(trg_preds['out'].detach()),
-                              target = self.trg_lbl) / 2 # for slowing learning speed
+                              target = self.trg_lbl) / 4 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             disc_loss = disc_loss.mean()
         disc_loss.backward()
         aux_disc_loss = self.aux_disc(self.prob2ent(trg_preds['aux_out'].detach()),
-                                      target = self.trg_lbl) / 2 # for slowing learning speed
+                                      target = self.trg_lbl) / 4 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             aux_disc_loss = aux_disc_loss.mean()
         aux_disc_loss.backward()
@@ -326,7 +335,7 @@ class AdvTrain_Deeplab(object):
         self.src_lbl = 0
         self.trg_lbl = 1
         self.prob2ent = Entropy(config['ita'], config['charbonnier'], config['reduce_dim'])
-
+        
     def get_scores(self):
         return self.metric.get_scores()
 
@@ -340,7 +349,7 @@ class AdvTrain_Deeplab(object):
     def defreeze(self, module):
         for param in module.parameters():
             param.requires_grad = True
-
+    
     def training_step(self, src_batch, trg_batch):
         img_batch = images_transform(src_batch['img'])
         lbl_batch = torch_resizer(masks_transform(src_batch['lbl']))

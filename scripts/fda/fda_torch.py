@@ -4,6 +4,11 @@ Created on Thu Nov 10 10:31:45 2022
 
 @author: talha
 """
+
+import yaml
+with open('./config.yaml') as fh:
+    config = yaml.load(fh, Loader=yaml.FullLoader)
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -11,7 +16,7 @@ import torch.nn as nn
 import cv2, random
 import numpy as np
 from tqdm import trange
-from cvt_color import YcbcrToRgb, RgbToYcbcr
+from fda.cvt_color import YcbcrToRgb, RgbToYcbcr
 
 ycc2rgb = YcbcrToRgb()
 rgb2ycc = RgbToYcbcr()
@@ -81,134 +86,33 @@ def FDA(im_src, im_trg, L=0.001, space='ycrcb', scale_back=True):
     
     return src_in_trg
 
-# def resize_std_norm(img, size=(512,512)):
-#     # first resize than normalize
-#     img = cv2.resize(img, size, interpolation=cv2.INTER_LINEAR)
-#     img = std_norm(img)
-#     return img
+class DomainAdapter:
+    def __init__(self, L=0.01, space='ycrcb'):
+        self.scale = lambda x, alpha, beta: (((beta-alpha) * (x-torch.min(x))) / (torch.max(x)-torch.min(x))) + alpha
+        self.L = L
+        self.space = space
 
-# class DomainAdapt:
-
-#     def __init__(self, trg_img_tensor):
-
-#         print('=> Loading and Adjusting Target Domain Tensors...')
-        
-#         self.trg_img_tensor = np.load(trg_img_tensor)#[0:10,...] # for testing
-        
-#         self.trg_img_tensor = np.asarray([resize_std_norm(self.trg_img_tensor[i,...], (config['patch_size'],config['patch_size'])) \
-#                                         for i in trange(self.trg_img_tensor.shape[0], desc='Preprocessing Tensor')])
-        
-#         self.trg_img_tensor = torch.from_numpy(self.trg_img_tensor).permute(0,3,1,2) # BCHW
-#         self.indices = np.arange(self.trg_img_tensor.shape[0])
-        
-#         print('[INFO] Traget Domain Tensors Loaded.')
+    def identity(self, src_batch, trg_batch):
+        # just pass through
+        return src_batch
     
-#     def __call__(self, img_src, L=0.002, img_trg=None, space = 'ycrcb'):
-
-#         if img_trg is None:
-#             np.random.shuffle(self.indices)
-#             a = torch.from_numpy(self.indices[0:config['batch_size']])     
-#             trg_imgs = torch.index_select(self.trg_img_tensor, dim=0, index=a).to('cuda' if torch.cuda.is_available() else 'cpu')
-#         else:
-#             trg_imgs = img_trg.to('cuda' if torch.cuda.is_available() else 'cpu')
-
-#         src_in_trg = FDA(img_src, trg_imgs, L=L, space=space)
-
-#         return src_in_trg, trg_imgs
-
-# class DARegulator:
-
-#     def __init__(self, trg_img_tensor, max_prob=0.7, till_epoch=60):
-#         self.da_porb = np.linspace(0, max_prob, till_epoch)
-#         self.id_prob = 1 - self.da_porb
-#         self.domainadapt = DomainAdapt(trg_img_tensor)
-
-#     def get_prob(self, current_epoch):
+    def domainadapt(self, src_batch, trg_batch):
+        for i in range(len(src_batch)):
+            src_batch[i:i+1, ...] = FDA(src_batch[i:i+1, ...], trg_batch[i:i+1, ...],
+                                        L=self.L, space=self.space)
+            # FFT changes the pixel values so scale them back between 0 and 1.
+            src_batch[i:i+1, ...] = self.scale(src_batch[i:i+1, ...], alpha=0, beta=1)
         
-#         if current_epoch < len(self.da_porb):
-#             a = self.da_porb[current_epoch]
-#             b = self.id_prob[current_epoch]
-#         else:
-#             a = self.da_porb[-1]
-#             b = self.id_prob[-1]
+        return src_batch
+    
+    def apply_fda(self, src_batch, trg_batch):
+        func_args = [
+            (self.domainadapt, (src_batch, trg_batch)),
+            (self.identity, (src_batch, trg_batch))
+        ]
         
-#         return a, b
-
-#     def identity(self, img_batch, L):
-#         # just pass through
-#         return img_batch, img_batch
-
-#     def __call__(self, img_batch, epoch, L=0.002):
-
-#         func_args = [
-#                     (self.domainadapt, (img_batch, L)),
-#                     (self.identity,    (img_batch, L))
-#                     ]
+        (func, args), = random.choices(func_args, weights=[config['prob_fda'], 1-config['prob_fda']])
         
-#         prob_da, porb_id = self.get_prob(epoch)
-
-#         (func, args), = random.choices(func_args, weights=[prob_da, porb_id])
+        src_batch = func(*args)
         
-#         img_batch, trg_img = func(*args)
-        
-#         return img_batch, trg_img, prob_da
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # self.trg_img_tensor = F.interpolate(self.trg_img_tensor,
-        #                                     (config['patch_size'],config['patch_size']),
-        #                                     mode='nearest')
-
-    # def apply(self, img_src, L=0.001, space = 'ycrcb'):
-        
-    #     np.random.shuffle(self.indices)
-    #     idx = np.random.randint(0, self.trg_img_tensor.shape[0])
-    #     trg_img = self.trg_img_tensor[idx:idx+1, ...].to('cuda' if torch.cuda.is_available else 'cpu')
-
-    #     src_in_trg = FDA(img_src, trg_img, L=L, space=space)
-
-    #     return src_in_trg, trg_img, idx
-################################################################
-#  USAGE
-################################################################
-
-# im_src = cv2.imread('C:/Users/talha/Desktop/Crops and Weeds/Domain Adaptation/code/src/synth_multi_w5_c40_w42_bg_015_pd_000187.jpg')
-# im_src = cv2.cvtColor(im_src, cv2.COLOR_BGR2RGB)
-# im_src = cv2.resize(im_src, (2048,2048))
-# im_src = std_norm(im_src)
-
-# im_trg = cv2.imread("C:/Users/talha/Desktop/Crops and Weeds/Domain Adaptation/code/trg/2022-07-03_yoon_bean-openf_90_1657277062536.jpg")
-# im_trg = cv2.cvtColor(im_trg, cv2.COLOR_BGR2RGB)
-# im_trg = cv2.resize(im_trg, (2048,2048))
-# im_trg = std_norm(im_trg)
-
-
-# op = FDA(im_src, im_trg, L=0.001, space='ycrcb')
-# plt.figure(1)
-# plt.imshow(op)
-
-# plt.figure(2)
-# plt.imshow(std_norm(op))
-# #%%
-# x = np.where(op<0, 0, 1)
-# plt.imshow(x[...,0])
-#%%
-# img = cv2.imread('E:/depth_new_rgb_color/img/img_357.png')
-
-# mask = cv2.imread('E:/depth_new_rgb_color/depth_colormap2/img_357.png')
-# plt.imshow(cv2.addWeighted(img, 0.7, mask, 0.3, 0.0))
-# plt.axis('off')
+        return src_batch

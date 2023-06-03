@@ -34,7 +34,7 @@ mpl.rcParams['figure.dpi'] = 300
 from data.dataloader import GEN_DATA_LISTS, CWD26
 from data.utils import collate, images_transform, torch_resizer, masks_transform
 
-from core.model import UHD_OCR
+from core.model import UHD_OCR, MaxViT_OCR
 from core.deeplab_resnet import  DeepLabv3_plus as DeepLabv3R
 from core.deeplab_xception import  DeepLabv3_plus as Deeplabv3X
 from core.psp import PSPNet
@@ -76,15 +76,15 @@ test_loader = get_data_loaders(config['trg_data_dir'])
 # plt.imshow(imgviz.tile(img_ls, shape=(2,config['batch_size']), border=(255,0,0)))
 # plt.axis('off')
 #%%
-# model = UHD_OCR(num_classes=config['num_classes'], in_channnels=3, embed_dims=config['embed_dims'],
-#                 ffn_ratios=config['ffn_ratios'], depths=config['depths'], num_stages=4,
-#                 dec_outChannels=config['dec_channels'], ls_init_val=float(config['layer_scaling_val']), 
-#                 drop_path=float(config['stochastic_drop_path']), drop_path_mode=config['SD_mode'],
-#                 config=config)
+model = MaxViT_OCR(num_classes=config['num_classes'], in_channnels=3, embed_dims=config['embed_dims'],
+                ffn_ratios=config['ffn_ratios'], depths=config['depths'], num_stages=4,
+                dec_outChannels=config['dec_channels'], ls_init_val=float(config['layer_scaling_val']), 
+                drop_path=float(config['stochastic_drop_path']), drop_path_mode=config['SD_mode'],
+                config=config)
 
 # model = PSPNet(n_classes=config['num_classes'], block_config=[3, 4, 23, 3], img_size=config['img_height'], img_size_8=64)
 # model = Deeplabv3X(nInputChannels=3, n_classes=config['num_classes'], os=16, pretrained=False, _print=True)
-model = DeepLabv3R(nInputChannels=3, n_classes=config['num_classes'], os=16, pretrained=True, _print=True)
+# model = DeepLabv3R(nInputChannels=3, n_classes=config['num_classes'], os=16, pretrained=True, _print=True)
               
 model = model.to('cuda' if torch.cuda.is_available() else 'cpu')
 # model= nn.DataParallel(model)
