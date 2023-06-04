@@ -15,7 +15,10 @@ import numpy as np
 from scipy.ndimage import label
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
-
+from skimage.segmentation import find_boundaries
+from gray2color import gray2color
+from skimage import measure
+# g2c = lambda x : gray2color(x, use_pallet='pannuke')
 
 def get_info_from_xml(xml_path):
     '''
@@ -28,39 +31,48 @@ def get_info_from_xml(xml_path):
     '''
     # reading xml file and converting into dictionary
     filepath = xml_path
-    full_dict = xmltodict.parse(open( filepath , 'rb' ))
+    
+    try:
+        full_dict = xmltodict.parse(open( filepath , 'rb' ))
+    except (FileNotFoundError, OSError):
+        full_dict = xmltodict.parse(filepath)
     
     # Extracting the coords and class names from xml file
     names = []
     coords = []
     
     obj_boxnnames = full_dict[ 'annotation' ][ 'object' ] # names and boxes
-    for obj in obj_boxnnames:
-        # get the name and indices of the class
+    # file_name = os.path.basename(filepath)[:-4]+'.jpg'#full_dict[ 'annotation' ][ 'filename' ]
+    # imgH = int(float(full_dict[ 'annotation' ][ 'size' ]['height']))
+    # imgW = int(float(full_dict[ 'annotation' ][ 'size' ]['width']))
+    for i in range(len(obj_boxnnames)):
+        # 1st get the name and indices of the class
         try:
-            obj_name = obj['name']
+            obj_name = obj_boxnnames[i]['name']
         except:
-            obj_name = 'default_name'  # assign a default name if the name key is missing
-        
-        # get the bbox coord and append the class name at the end
+            obj_name = obj_boxnnames['name']  # if the xml file has only one object key
+            
+        # 2nd get tht bbox coord and append the class name at the end
         try:
-            obj_box = obj['bndbox']
+            obj_box = obj_boxnnames[i]['bndbox']
         except:
-            continue  # skip this object if the bndbox key is missing
-        
-        bounding_box = [0.0] * 4
-        bounding_box[0] = int(float(obj_box['xmin']))
-        bounding_box[1] = int(float(obj_box['ymin']))
-        bounding_box[2] = int(float(obj_box['xmax']))
+            obj_box = obj_boxnnames['bndbox'] # if the xml file has only one object key
+        bounding_box = [0.0] * 4                    # creat empty list
+        bounding_box[0] = int(float(obj_box['xmin']))# two times conversion is for handeling exceptions 
+        bounding_box[1] = int(float(obj_box['ymin']))# so that if coordinates are given in float it'll
+        bounding_box[2] = int(float(obj_box['xmax']))# still convert them to int
         bounding_box[3] = int(float(obj_box['ymax']))
-        
+        # convert absolute coords to relative coords
+        # bounding_box[0] = bounding_box[0] * 1 / imgW
+        # bounding_box[1] = bounding_box[1] * 1 / imgH
+        # bounding_box[2] = bounding_box[2] * 1 / imgW
+        # bounding_box[3] = bounding_box[3] * 1 / imgH
         names.append(obj_name)
         coords.append(bounding_box)
         
     return np.asarray(names).astype('<U16'), np.asarray(coords)
 
-def draw_boxes(image_in, confidences, nms_box, det_classes, classes, img_h = 640,
-               img_w = 640, order='yx_minmax', analysis=False):
+def draw_boxes(image_in, confidences, nms_box, det_classes, classes, modified=False):
     '''
     Parameters
     ----------
@@ -88,39 +100,31 @@ def draw_boxes(image_in, confidences, nms_box, det_classes, classes, img_h = 640
         facebox = result[1].astype(np.int16)
         #print(facebox)
         name = result[2]
-        color = colors[classes.index(name)]#result[3]
-        if analysis and order == 'yx_minmax': # pred
+
+        if modified: # pred
             color = (1., 0., 0.) # red  
             bb_line_tinkness = 2
-            label = 'P'
-        if analysis and order == 'xy_minmax': # gt
-            color = (0., 1., 0.)  # green 
+            label = 'M'
+        if not modified: # gt
+            color = (0., 0.647, 1.)  # cyan 
             bb_line_tinkness = 2
-            label = 'G'
+            label = 'O'
         
         
         cv2.rectangle(image, (facebox[0], facebox[1]),
                      (facebox[2], facebox[3]), color, bb_line_tinkness)#255, 0, 0
-        # again assign color to update label tag
-        color = colors[classes.index(name)]
+
         
-        if analysis:
-            label_size, base_line = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_DUPLEX   , 0.7, 1)
+        
+        label_size, base_line = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_DUPLEX   , 0.7, 1)
             
-            if order == 'xy_minmax': # gt
-                cv2.rectangle(image, (facebox[2]-2, facebox[1] - label_size[1]), # top left cornor
-                          (facebox[2] + label_size[0]-2, facebox[1] + base_line-1),# bottom right cornor
-                          color, cv2.FILLED)
-                op = cv2.putText(image, label, (facebox[2], facebox[1]),
-                       cv2.FONT_HERSHEY_DUPLEX   , 0.7, (0, 0, 0))
+        cv2.rectangle(image, (facebox[2]-2, facebox[1] - label_size[1]), # top left cornor
+                  (facebox[2] + label_size[0]-2, facebox[1] + base_line-1),# bottom right cornor
+                  color, cv2.FILLED)
+        op = cv2.putText(image, label, (facebox[2], facebox[1]),
+               cv2.FONT_HERSHEY_DUPLEX   , 0.7, (0, 0, 0))
                 
-            if order == 'yx_minmax': # pred
-                cv2.rectangle(image, (facebox[0], facebox[1] - label_size[1]),# top left cornor
-                         (facebox[0] + label_size[0], facebox[1] + base_line-1),# bottom right cornor
-                         color, cv2.FILLED)
-                op = cv2.putText(image, label, (facebox[0], facebox[1]),
-                       cv2.FONT_HERSHEY_DUPLEX   , 0.7, (0, 0, 0))
              
         i = i+1
     return (image*255).astype(np.uint8), boxes, det_classes, np.round(confidences, 3)
@@ -212,7 +216,7 @@ def assign_classes(binary_mask, coords, det_classes, class_dict):
     return s
 
 
-def create_data_dir_tree(base_dir, visualize_dir=False):
+def create_data_dir_tree(base_dir, visualize_dir=False, xml_dir=True):
     try:
         base_dir = os.path.join(base_dir, 'processed')
         os.mkdir(base_dir)
@@ -229,7 +233,10 @@ def create_data_dir_tree(base_dir, visualize_dir=False):
     third_level_dirs = ['train', 'test', 'val']
     
     # Define the fourth-level directories
-    fourth_level_dirs = ['images', 'labels']
+    if xml_dir:
+        fourth_level_dirs = ['images', 'labels', 'xmls']
+    else:
+        fourth_level_dirs = ['images', 'labels']
     
     # Iterate through the levels and create directories
     for top_dir in top_dirs:
@@ -253,15 +260,15 @@ def create_data_dir_tree(base_dir, visualize_dir=False):
     
     return None
 
-
-def mask_to_bounding_boxes(mask, class_dict, filename, width, height, depth=3):
+def mask_to_bounding_boxes(mask, filename, width, height, depth=3):
+    
+    class_dict = {'ring': 1, 'trophozoite':2, 'schizont':3, 'gametocyte':4}
     # Initialize the XML tree
     root = ET.Element('annotation')
 
     ET.SubElement(root, 'folder').text = "LabelledImages"
     ET.SubElement(root, 'filename').text = filename
     ET.SubElement(root, 'path').text = '/path/to/' + filename  # Add correct path here
-    # ET.SubElement(root, 'source').subElement(ET.Element('database')).text = 'Unknown'
 
     size = ET.SubElement(root, 'size')
     ET.SubElement(size, 'width').text = str(width)
@@ -272,32 +279,94 @@ def mask_to_bounding_boxes(mask, class_dict, filename, width, height, depth=3):
 
     # Generate a bounding box for each class
     for class_name, class_value in class_dict.items():
-        # Get the coordinates of the current class
-        coords = np.where(mask == class_value)
+        class_mask = (mask == class_value)
 
-        if coords[0].size == 0: # If there is no instance of this class in the mask, skip to next class
+        if not class_mask.any():  # If there is no instance of this class in the mask, skip to next class
             continue
 
-        # Calculate the bounding box
-        xmin, ymin = np.min(coords[1]), np.min(coords[0])
-        xmax, ymax = np.max(coords[1]), np.max(coords[0])
+        # Label each individual segment
+        labeled, num_labels = measure.label(class_mask, connectivity=2, return_num=True)
 
-        # Add the object to the XML tree
-        object_elem = ET.SubElement(root, 'object')
-        ET.SubElement(object_elem, 'name').text = class_name
-        ET.SubElement(object_elem, 'pose').text = 'Unspecified'
-        ET.SubElement(object_elem, 'truncated').text = '0'
-        ET.SubElement(object_elem, 'difficult').text = '0'
+        for i in range(1, num_labels+1):
+            coords = np.where(labeled == i)
 
-        bndbox = ET.SubElement(object_elem, 'bndbox')
-        ET.SubElement(bndbox, 'xmin').text = str(xmin)
-        ET.SubElement(bndbox, 'ymin').text = str(ymin)
-        ET.SubElement(bndbox, 'xmax').text = str(xmax)
-        ET.SubElement(bndbox, 'ymax').text = str(ymax)
+            # Calculate the bounding box
+            xmin, ymin = np.min(coords[1]), np.min(coords[0])
+            xmax, ymax = np.max(coords[1]), np.max(coords[0])
+
+            # Add the object to the XML tree
+            object_elem = ET.SubElement(root, 'object')
+            ET.SubElement(object_elem, 'name').text = class_name.lower()
+            ET.SubElement(object_elem, 'pose').text = 'Unspecified'
+            ET.SubElement(object_elem, 'truncated').text = '0'
+            ET.SubElement(object_elem, 'difficult').text = '0'
+
+            bndbox = ET.SubElement(object_elem, 'bndbox')
+            ET.SubElement(bndbox, 'xmin').text = str(xmin)
+            ET.SubElement(bndbox, 'ymin').text = str(ymin)
+            ET.SubElement(bndbox, 'xmax').text = str(xmax)
+            ET.SubElement(bndbox, 'ymax').text = str(ymax)
 
     # Return the prettified XML string
     xml_string = ET.tostring(root, 'utf-8')
     parsed_xml = minidom.parseString(xml_string)
     return parsed_xml.toprettyxml(indent="  ")
 
+def gray2encoded(y_true, num_class):
+    '''
+    Parameters
+    ----------
+    y_true : 2D array of shape [H x W] containing unique pixel values for all N classes i.e., [0, 1, ..., N] 
+    num_class : int no. of classes inculding BG
+    Returns
+    -------
+    encoded_op : one-hot encoded 3D array of shape [H W N] where N=num_class
+    '''
 
+    # Ensure y_true is integer type
+    y_true = y_true.astype('int32')
+    
+    # One-hot encoding
+    encoded_op = np.eye(num_class)[y_true]
+    
+    return encoded_op.astype('uint8')
+
+def get_sem_bdr(sem, img, blend=True, custom_pallet=None):
+    '''
+    Parameters
+    ----------
+    sem : a 2D array of shape [H, W] where containing unique value for each class.
+    img : Original RGB image for overlaying the semantic seg results
+    blend: wether to project the inst mask over the RGB original image or not
+    Returns
+    -------
+    blend : a 3D array in RGB format [H W 3] in which each class have a unique RGB border. 
+            1. overalyed over original image if; blend=True
+            2. Raw mask if; blend=False
+    ''' 
+    # if you get shape mismatch error try swaping the (w,h) argument of the line below.
+    # i.e., from (x.shape[0], x.shape[1]) to (x.shape[1], x.shape[0]).
+    # img = cv2.resize(img, (sem.shape[1], sem.shape[0]), interpolation=cv2.INTER_LINEAR) 
+    # 1-hot encode all classes 
+    sem_enc = gray2encoded(sem, num_class=5)
+    # as the in encoded output the 0th channel will be BG we don't need it so
+    sem_enc = sem_enc[:,:,1:]
+    # get boundaries of thest isolated instances
+    temp = np.zeros(sem_enc.shape)
+    
+    for i in range(sem_enc.shape[2]):
+        temp[:,:,i] = find_boundaries(sem_enc[:,:,i], connectivity=1, mode='thick', background=0)
+    
+    dummy = np.zeros((temp.shape[0], temp.shape[1], 1))
+    temp =  np.concatenate((dummy, temp), axis=-1)
+        
+    sem_bdr = np.argmax(temp, axis=-1).astype(np.uint8)
+    sem_bdr_rgb = gray2color(sem_bdr, use_pallet='pannuke', custom_pallet=custom_pallet)
+    if blend:
+        inv = 1 - cv2.threshold(sem_bdr.astype(np.uint8), 0, 1, cv2.THRESH_BINARY)[1]
+        inv = cv2.merge((inv, inv, inv))
+        blend = np.multiply(img, inv)
+        blend = np.add(blend, sem_bdr_rgb)
+    else:
+        blend = sem_bdr_rgb
+    return blend.astype(np.uint8)

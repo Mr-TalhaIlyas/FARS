@@ -2,14 +2,14 @@
 # of crop and weed dataset
 
 #'0,1,2,3'
-gpus_to_use: '0'
+gpus_to_use: '3'
 DPI: 300
 LOG_WANDB:  True
 sanity_check: False
 
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'Same_losvaz_slowDisc4_mfda7_400x'
+experiment_name: 'Same_losvaz_slowDisc2_mfda5_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -53,7 +53,7 @@ geometric_aug: [0.3]
 #, 0.1, 0.2, 0.4, 0.3, 0.3]
 noise_aug:     [0.3]
 #, 0.1, 0.2, 0.2, 0.2, 0.2]
-prob_fda: 0.7
+prob_fda: 0.5
 L: 0.01
 space: 'ycrcb'
 # Regularization SD 0.5 LS 1e-2
@@ -62,7 +62,7 @@ SD_mode: 'batch'
 layer_scaling_val: 1e-5
 
 # learning rate
-learning_rate: 0.0005
+learning_rate: 0.001
 learning_rate_d: 0.00001
 lr_schedule: 'cos'
 lr_schedule_d: 'poly'
@@ -107,12 +107,12 @@ ita: 2.0
 charbonnier: True
 reduce_dim: False
 
-classes:
-  [
-    "background",
-    "bean",
-    "weed",
-  ]
+# classes:
+#   [
+#     "background",
+#     "bean",
+#     "weed",
+#   ]
 
 # pallet:  
 #         - [0, 0, 0]

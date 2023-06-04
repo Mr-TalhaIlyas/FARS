@@ -5,10 +5,12 @@
 gpus_to_use: '3'
 DPI: 300
 LOG_WANDB:  False
+sanity_check: True
 
+use_model: 'proposed'
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'Same_losvaz_slowDisc4_mfda7_400x'
+experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -29,7 +31,7 @@ TRG_DOMAIN_LBL: 1
 
 pin_memory: True
 num_workers: 6
-num_classes: 3
+num_classes: 5
 img_height: 512
 img_width: 512
 # 4 means output of network is 4 times downsampled than input.

@@ -126,7 +126,7 @@ for machine in machines:
             
             # write updated tight bouding boxes.
             if write_updated_xml:
-                xml = mask_to_bounding_boxes(sem_seg, class_dict, file_name, sem_seg.shape[1], sem_seg.shape[0], depth=3)
+                xml = mask_to_bounding_boxes(sem_seg, f'{file_name}.png', sem_seg.shape[1], sem_seg.shape[0], depth=3)
     
                 with open(processed_xml, 'w') as file:
                     file.write(xml)
@@ -135,18 +135,24 @@ for machine in machines:
             cv2.imwrite(str(Path(processed_lbl)), sem_seg)
             
             if save_visulizations:
-                # clr_sem_seg = g2c(sem_seg)
+                
                 confidences = np.zeros(det_classes.shape)
+                # draw original boxes
                 op, _, _, _ = draw_boxes(image, confidences, coords, det_classes, list(class_dict.keys()))
+                # draw generated segments
                 x = get_sem_bdr(sem_seg, op)
-                # x = cv2.addWeighted(op, 0.6, clr_sem_seg, 0.4, 1)
+                # draw modified boxes
+                det_classes, coords = get_info_from_xml(xml)
+                z, _, _, _ = draw_boxes(x, confidences, coords, det_classes, list(class_dict.keys()), modified=True)
                 
                 cv2.imwrite(str(Path(processed_data_dir) / 'processed' / 'visualize' / f'{machine}_{file_name}.png'),
-                            cv2.cvtColor(x, cv2.COLOR_BGR2RGB))
+                            cv2.cvtColor(z, cv2.COLOR_BGR2RGB))
         except:
             print(f'\nError in xml file check {img_paths[i]}')
             pass
-        
+            # break
+    
     print(f'[INFO] {machine} Machine done.')
+    # break
             
 

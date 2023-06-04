@@ -281,25 +281,25 @@ class AdvTrain(object):
 
         # with source data
         disc_loss = self.disc(self.prob2ent(src_preds['out'].detach()),
-                              target = self.src_lbl) / 4 # for slowing learning speed
+                              target = self.src_lbl) / 2 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             disc_loss = disc_loss.mean()
         disc_loss.backward()
 
         aux_disc_loss = self.aux_disc(self.prob2ent(src_preds['aux_out'].detach()),
-                                      target = self.src_lbl) / 4 # for slowing learning speed
+                                      target = self.src_lbl) / 2 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             aux_disc_loss = aux_disc_loss.mean()
         aux_disc_loss.backward()
 
         # with target data
         disc_loss = self.disc(self.prob2ent(trg_preds['out'].detach()),
-                              target = self.trg_lbl) / 4 # for slowing learning speed
+                              target = self.trg_lbl) / 2 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             disc_loss = disc_loss.mean()
         disc_loss.backward()
         aux_disc_loss = self.aux_disc(self.prob2ent(trg_preds['aux_out'].detach()),
-                                      target = self.trg_lbl) / 4 # for slowing learning speed
+                                      target = self.trg_lbl) / 2 # for slowing learning speed
         if torch.cuda.device_count() > 1: # average loss across CUDA devices.
             aux_disc_loss = aux_disc_loss.mean()
         aux_disc_loss.backward()
