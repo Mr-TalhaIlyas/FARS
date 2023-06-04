@@ -2,7 +2,7 @@
 # of crop and weed dataset
 
 #'0,1,2,3'
-gpus_to_use: '3'
+gpus_to_use: '0'
 DPI: 300
 LOG_WANDB:  False
 sanity_check: True
@@ -14,12 +14,22 @@ experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
+predictions_dir: "/home/user01/data/talha/CMED/preds/"
 use_ocr: True
 
+# the model is trained on HCM and tested on LCM, so trg machine in actually the test data.
+trg_machine: 'HCM'
+# select magnification for testing 
+meg: '400x'
+split: 'test'
+iou_threshold: 0.5
 # Data loader parameters
+data_dir: "/home/user01/data/talha/CMED/dataset/"
 
-src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/400x/"
-trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/400x/"
+# original annotaions provided by the paper to reconstructed ones i.e., blobs to boxes.
+orig_annotations: False
+# src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/400x/"
+# trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/400x/"
 
 # add sub dirs inside of train/val and test
 sub_directories: ['images/', 'labels/']

@@ -21,6 +21,8 @@ if config['LOG_WANDB']:
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from pathlib import Path
+from tabulate import tabulate
 
 import imgviz, cv2
 import numpy as np
@@ -29,8 +31,9 @@ import matplotlib as mpl
 from tqdm import tqdm
 mpl.rcParams['figure.dpi'] = 300
 
-from data.dataloader import GEN_DATA_LISTS, CWD26, inference_loader, write_eval_txt_files
+from data.dataloader import GEN_DATA_LISTS, CWD26
 from data.utils import collate, images_transform, torch_resizer, masks_transform
+from infer_utils import inference_loader, Segmentation2Bbox, get_data_loaders, get_data_paths
 
 from core.model import UHD_OCR, MaxViT_OCR
 from core.deeplab_resnet import  DeepLabv3_plus as DeepLabv3R
@@ -47,32 +50,28 @@ from fmutils import fmutils as fmu
 from empatches import EMPatches
 from data.utils import std_norm
 from gray2color import gray2color
+import eval.src.evaluators.coco_evaluator as coco_evaluator
+import eval.src.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
+import eval.src.utils.converter as converter
+from eval.src.utils.enumerators import (BBFormat, BBType, CoordinatesType,
+                                   MethodAveragePrecision)
+
+
 g2c = lambda x : gray2color(x, use_pallet='cityscape',
                             custom_pallet=np.asarray(config['pallet']).reshape(1,-1,3)/255)
 emp = EMPatches()
 
-def get_data_loaders(data_dir):
-    data_lists = GEN_DATA_LISTS(data_dir, config['sub_directories'])
-    _, test_paths, _ = data_lists.get_splits()
-    classes = data_lists.get_classes()
-    data_lists.get_filecounts()
+class_dict = {'ring': 1, 'trophozoite':2, 'schizont':3, 'gametocyte':4}
 
-    test_data = CWD26(test_paths[0], test_paths[1], config['img_height'], config['img_width'],
-                        False, config['Normalize_data'])
 
-    test_loader = DataLoader(test_data, batch_size=config['batch_size'], shuffle=False,
-                            collate_fn=collate)
-    return test_loader
+meg = config['meg']
 
-def get_data_loaders2(data_dir):
+data_dir = Path(config['data_dir'], config['trg_machine'], meg)
 
-    data_lists = GEN_DATA_LISTS(data_dir, config['sub_directories'])
-    _, _, test_paths = data_lists.get_splits()
-    img_paths, lbl_paths = test_paths
-    return img_paths, lbl_paths
+seg2bbox = Segmentation2Bbox(class_dict, config['predictions_dir'], config['trg_machine'], meg)
 
-test_loader = get_data_loaders(config['trg_data_dir'])
-test_paths = get_data_loaders2(config['trg_data_dir'])
+img_paths, lbl_paths = get_data_paths(data_dir)
+test_loader = get_data_loaders(data_dir)
 
 if config['sanity_check']:
     # DataLoader Sanity Checks
@@ -104,76 +103,83 @@ elif config['use_model'] == 'DeepLab':
     # model = DeepLabv3R(nInputChannels=3, n_classes=config['num_classes'], os=16, pretrained=True, _print=True)
               
 model = model.to('cuda' if torch.cuda.is_available() else 'cpu')
-metric = ConfusionMatrix(config['num_classes'])
 mu = ModelUtils(config['num_classes'], config['checkpoint_path'], config['experiment_name'])
-
 # mu.load_chkpt(model)
 mu.load_pretrained_chkpt(model, f'/home/user01/data/talha/CMED/chkpts/{config["experiment_name"]}.pth')
 #%%
 ###########################
-#  EVALUATION
+#  EVALUATION on Target
 ###########################
 
 metric = ConfusionMatrix(config['num_classes'])
-class_dict = {'ring': 1, 'trophozoite':2, 'schizont':3, 'gametocyte':4}
 
-magnifications = ['400x/']#['100x/', '400x/', '1000x/']
-# data_dir = "/home/user01/data/talha/bean_uda/datasets/src/"
+# magnifications = ['400x/']#['100x/', '400x/', '1000x/']
+# for meg in magnifications:
+avg = []
+model.eval()
+for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
 
-for meg in magnifications:
-    data_dir = f"/home/user01/data/talha/CMED/dataset/HCM/{meg}/"
+    img, lbl, orig_h, orig_w, filename = inference_loader(img_path, lbl_path)
+    img_batch = images_transform([img])
+    lbl_batch = torch_resizer(masks_transform([lbl]))
 
-    img_paths, lbl_paths = get_data_loaders2(data_dir)
-    
-    crop, weed, avg = [], [], []
-
-    model.eval()
-    for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
-
-        img, lbl, orig_h, orig_w, filename = inference_loader(img_path, lbl_path)
-        img_batch = images_transform([img])
-        lbl_batch = torch_resizer(masks_transform([lbl]))
-
-        with torch.no_grad():
-            if config['use_model'] == 'proposed':
-                _, preds = model.forward(img_batch) # UHD_OCR
-            elif config['use_model'] == 'PSP':
-                preds, _ = model.forward(img_batch) # PSP
-            elif config['use_model'] == 'DeepLab':
-                preds = model.forward(img_batch) # Deep Lab
-                
+    with torch.no_grad():
         if config['use_model'] == 'proposed':
-            preds = preds['out'] # UHD_OCR
+            _, preds = model.forward(img_batch) # UHD_OCR
+        elif config['use_model'] == 'PSP':
+            preds, _ = model.forward(img_batch) # PSP
+        elif config['use_model'] == 'DeepLab':
+            preds = model.forward(img_batch) # Deep Lab
+            
+    if config['use_model'] == 'proposed':
+        preds = preds['out'] # UHD_OCR
 
-        # write_boxes_and_confidences_to_file(preds.clone(), filename, class_dict)
-        write_eval_txt_files(preds.clone(), class_dict, filename, orig_h, orig_w)
+    seg2bbox.write_eval_txt_files(preds.clone(), filename, orig_h, orig_w)
 
-        preds = preds.argmax(1)
-        preds = preds.cpu().numpy()
-        lbl_batch = lbl_batch.cpu().numpy()
-        metric.update(lbl_batch, preds)
-        iou = metric.get_scores()
-        metric.reset()
-        # crop.append(iou['iou'][1])
-        # weed.append(iou['iou'][2])
-        avg.append(iou['iou_mean'])
+    preds = preds.argmax(1)
+    preds = preds.cpu().numpy()
+    lbl_batch = lbl_batch.cpu().numpy()
+    metric.update(lbl_batch, preds)
+    iou = metric.get_scores()
+    metric.reset()
+    avg.append(iou['iou_mean'])
 
-    # crop = np.array(crop)
-    # weed = np.array(weed)
-    avg = np.array(avg)
+avg = np.array(avg)
+avg[avg==0.0] = np.nan
 
-    # crop[crop==0.0] = np.nan
-    # weed[weed==0.0] = np.nan
-    avg[avg==0.0] = np.nan
+###########################
+#  CALCULATE mAP
+###########################
 
-    print(f'{set} @ {config["experiment_name"]}')
-    print(f'Avg: {np.nanmean(avg)}')
-    
+# DEFINE GROUNDTRUTHS AND DETECTIONS
+dir_imgs = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'images')
+dir_gts = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'xmls')
+if config['orig_annotations']:
+    dir_gts = Path(config['data_dir'], 'Annotations', config['trg_machine'], config['split'], meg)
+dir_dets = Path(config['predictions_dir'], config['trg_machine'], meg)
+
+# Get annotations (ground truth and detections)
+gt_bbs = converter.vocpascal2bb(dir_gts)
+det_bbs = converter.text2bb(dir_dets, bb_type=BBType.DETECTED, bb_format=BBFormat.XYX2Y2,
+                            type_coordinates=CoordinatesType.ABSOLUTE, img_dir=dir_imgs)
+
+# EVALUATE WITH COCO METRICS
+coco_res1 = coco_evaluator.get_coco_summary(gt_bbs, det_bbs)
+# coco_res2 = coco_evaluator.get_coco_metrics(gt_bbs, det_bbs)
+
+# EVALUATE WITH VOC PASCAL METRICS
+iou = config['iou_threshold']
+dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(
+    gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
+
+print(f'{dir_imgs}\n{dir_gts}\n{dir_dets}\n')
+print(f'Avg IoU: {np.nanmean(avg)}\n')
+
+print(f'Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
+
+print(tabulate(coco_res1.items(), headers=["Key", "Value"], tablefmt="github", floatfmt=".5f"))
+
 #%%
-
-
-
-
 
 
 

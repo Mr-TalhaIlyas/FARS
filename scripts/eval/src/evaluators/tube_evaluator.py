@@ -1,11 +1,11 @@
 import os
 
 import numpy as np
-from src.evaluators.pascal_voc_evaluator import (calculate_ap_11_point_interp,
+from eval.src.evaluators.pascal_voc_evaluator import (calculate_ap_11_point_interp,
                                                  calculate_ap_every_point)
-from src.tube import Tube
-from src.utils.enumerators import MethodAveragePrecision
-from src.utils.read_files import File
+from eval.src.tube import Tube
+from eval.src.utils.enumerators import MethodAveragePrecision
+from eval.src.utils.read_files import File
 
 
 class TubeEvaluator():
