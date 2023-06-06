@@ -4,8 +4,8 @@ import random
 import cv2
 import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import QFileDialog, QMainWindow
-from src.bounding_box import BoundingBox
-from src.ui.results_ui import Ui_Form_results as Results_UI
+from map.bounding_box import BoundingBox
+from map.ui.results_ui import Ui_Form_results as Results_UI
 
 
 class Results_Dialog(QMainWindow, Results_UI):

@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 from PyQt5 import QtCore, QtGui
-from eval.src.utils.enumerators import BBFormat
+from eval.map.utils.enumerators import BBFormat
 
 
 def get_classes_from_txt_file(filepath_classes_det):

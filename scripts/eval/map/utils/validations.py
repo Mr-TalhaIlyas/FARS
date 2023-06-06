@@ -3,8 +3,8 @@ import os
 import xml.etree.ElementTree as ET
 
 import pandas as pd
-from eval.src.utils.enumerators import CoordinatesType
-from eval.src.utils.general_utils import get_files_recursively
+from eval.map.utils.enumerators import CoordinatesType
+from eval.map.utils.general_utils import get_files_recursively
 
 from .enumerators import BBFormat, BBType, FileFormat
 

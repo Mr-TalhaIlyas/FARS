@@ -2,12 +2,12 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
-import src.evaluators.coco_evaluator as coco_evaluator
-import src.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
-import src.utils.converter as converter
-import src.utils.general_utils as general_utils
-from src.bounding_box import BoundingBox
-from src.utils.enumerators import (BBFormat, BBType, CoordinatesType,
+import map.evaluators.coco_evaluator as coco_evaluator
+import map.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
+import map.utils.converter as converter
+import map.utils.general_utils as general_utils
+from map.bounding_box import BoundingBox
+from map.utils.enumerators import (BBFormat, BBType, CoordinatesType,
                                    MethodAveragePrecision)
 
 #############################################################

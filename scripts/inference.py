@@ -33,7 +33,8 @@ mpl.rcParams['figure.dpi'] = 300
 
 from data.dataloader import GEN_DATA_LISTS, CWD26
 from data.utils import collate, images_transform, torch_resizer, masks_transform
-from infer_utils import inference_loader, Segmentation2Bbox, get_data_loaders, get_data_paths
+from infer_utils import (inference_loader, Segmentation2Bbox, get_data_loaders,
+                         get_data_paths, make_onehot)
 
 from core.model import UHD_OCR, MaxViT_OCR
 from core.deeplab_resnet import  DeepLabv3_plus as DeepLabv3R
@@ -50,19 +51,19 @@ from fmutils import fmutils as fmu
 from empatches import EMPatches
 from data.utils import std_norm
 from gray2color import gray2color
-import eval.src.evaluators.coco_evaluator as coco_evaluator
-import eval.src.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
-import eval.src.utils.converter as converter
-from eval.src.utils.enumerators import (BBFormat, BBType, CoordinatesType,
+import eval.map.evaluators.coco_evaluator as coco_evaluator
+import eval.map.evaluators.pascal_voc_evaluator as pascal_voc_evaluator
+import eval.map.utils.converter as converter
+from eval.map.utils.enumerators import (BBFormat, BBType, CoordinatesType,
                                    MethodAveragePrecision)
-
+from eval.mpq.run import get_pq
 
 g2c = lambda x : gray2color(x, use_pallet='cityscape',
                             custom_pallet=np.asarray(config['pallet']).reshape(1,-1,3)/255)
 emp = EMPatches()
 
 class_dict = {'ring': 1, 'trophozoite':2, 'schizont':3, 'gametocyte':4}
-
+slides = 'blood-smear-slides'
 
 meg = config['meg']
 
@@ -116,7 +117,13 @@ metric = ConfusionMatrix(config['num_classes'])
 # magnifications = ['400x/']#['100x/', '400x/', '1000x/']
 # for meg in magnifications:
 avg = []
+op = np.zeros((len(img_paths), 128, 128, 5))
+orig = np.zeros((len(img_paths), 128, 128, 5))
+types = []
+
 model.eval()
+
+i = 0
 for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
 
     img, lbl, orig_h, orig_w, filename = inference_loader(img_path, lbl_path)
@@ -139,13 +146,32 @@ for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
     preds = preds.argmax(1)
     preds = preds.cpu().numpy()
     lbl_batch = lbl_batch.cpu().numpy()
+
     metric.update(lbl_batch, preds)
     iou = metric.get_scores()
     metric.reset()
     avg.append(iou['iou_mean'])
-
+    # PQ array writing  
+    op[i, ...] = make_onehot(preds.squeeze().astype(np.uint8), config['num_classes'])
+    orig[i, ...] = make_onehot(lbl_batch.squeeze().astype(np.uint8), config['num_classes'])
+    types.append(slides)
+    i += 1
+    
 avg = np.array(avg)
 avg[avg==0.0] = np.nan
+
+###########################
+#  CALCULATE mPQ/bPQ
+###########################
+
+print('Saving Output Arrays')
+os.makedirs(Path(config['predictions_dir'],'PQ'), exist_ok=True)
+np.save(Path(config['predictions_dir'],'PQ', 'preds.npy'), op) # cnns predictions
+np.save(Path(config['predictions_dir'],'PQ', 'gts.npy'), orig) # ground truths
+np.save(Path(config['predictions_dir'],'PQ','types.npy'), np.asarray(types)) # tumor tissue types
+print('Done Saving Arrays')
+
+get_pq(Path(config['predictions_dir'],'PQ'), config['iou_threshold'])
 
 ###########################
 #  CALCULATE mAP
@@ -172,107 +198,16 @@ iou = config['iou_threshold']
 dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(
     gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
 
-print(f'{dir_imgs}\n{dir_gts}\n{dir_dets}\n')
+
+print(30*'/')
 print(f'Avg IoU: {np.nanmean(avg)}\n')
-
+print(30*'/')
 print(f'Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
-
+print(30*'/')
+print('COCO Metrics')
 print(tabulate(coco_res1.items(), headers=["Key", "Value"], tablefmt="github", floatfmt=".5f"))
 
+print(30*'/')
+print(f'{dir_imgs}\n{dir_gts}\n{dir_dets}\n')
 #%%
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# # %%
-# files = fmu.get_all_files('/home/user01/data/talha/bean_uda/datasets/preds/imgs/')
-
-# for i in range(len(files)):
-#     img = cv2.imread(files[i])
-#     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-#     img = cv2.resize(img, (config['img_width'], config['img_height']), interpolation=cv2.INTER_LINEAR).astype(np.uint8)
-#     img = std_norm(img)
-
-#     name = fmu.get_basename(files[i], False)
-#     model.eval()
-#     img_batch = images_transform([img])
-
-#     with torch.no_grad():
-#         # _, preds = model.forward(img_batch) # UHD_OCR
-#         # preds, _ = model.forward(img_batch) # PSP
-#         preds = model.forward(img_batch) # Deep Lab
-
-#     # preds = preds['out'] # UHD_OCR
-#     preds = preds.argmax(1)
-#     preds = preds.cpu().numpy().squeeze()
-#     preds = g2c(preds)
-
-#     preds = cv2.cvtColor(preds, cv2.COLOR_BGR2RGB)
-#     cv2.imwrite(f'/home/user01/data/talha/bean_uda/datasets/preds/adseg/{name}.png', preds)
-# # %%
-# batch = next(iter(test_loader))
-# img_batch = images_transform(batch['img'])
-# lbl_batch = batch['lbl'][0]#torch_resizer(masks_transform(batch['lbl']))
-
-# model.eval()
-# with torch.no_grad():
-#     _, preds = model.forward(img_batch) 
-    
-# preds = preds['out'].argmax(1)
-# preds = preds.cpu().numpy().squeeze()
-# preds = cv2.resize(preds, (config['img_width'], config['img_height']), interpolation=cv2.INTER_NEAREST).astype(np.uint8)
-# plt.imshow(g2c(preds))
-# %%

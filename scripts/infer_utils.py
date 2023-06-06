@@ -11,6 +11,7 @@ from pathlib import Path
 from data.dataloader import GEN_DATA_LISTS, CWD26
 from torch.utils.data import DataLoader
 from data.utils import collate
+from skimage import measure
 
 def get_data_loaders(data_dir):
     data_lists = GEN_DATA_LISTS(data_dir, config['sub_directories'])
@@ -99,71 +100,18 @@ class Segmentation2Bbox():
         boxes, confidences, classes = self.get_segment_boxes_and_confidences(probs)
         self.write_boxes_and_confidences_to_file(filename, boxes, confidences, classes, orig_h, orig_w)
 
-
-# def get_segment_boxes_and_confidences(seg_mask, class_dict, relative_coords=True):
-#     H, W, C = seg_mask.shape
-#     boxes = []
-#     confidences = []
-#     classes = []
-
-#     for i, class_name in enumerate(class_dict.keys()):
-#         class_idx = class_dict[class_name]
-#         class_mask = seg_mask[:, :, class_idx]
-
-#         # Convert to binary mask
-#         binary_mask = (class_mask > 0.5).astype(np.uint8)
-
-#         # Find connected components
-#         num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary_mask, connectivity=8)
-
-#         for j in range(1, num_labels):
-#             x, y, w, h, _ = stats[j]
-
-#             if relative_coords:
-#                 # Convert to relative coordinates
-#                 x_min, y_min, x_max, y_max = x/W, y/H, (x + w)/W, (y + h)/H
-#                 boxes.append([x_min, y_min, x_max, y_max])  # xmin, ymin, xmax, ymax
-#             else:
-#                 boxes.append([x, y, x + w, y + h])  # xmin, ymin, xmax, ymax
-
-#             # Get segment confidence
-#             segment_mask = (labels == j)
-#             segment_confidence = torch.tensor(class_mask[segment_mask]).mean().item()
-#             confidences.append(segment_confidence)
-            
-#             # Append class name
-#             classes.append(class_name)
-
-#     return boxes, confidences, classes
-
-# def write_boxes_and_confidences_to_file(filename, boxes, confidences, classes, orig_h, orig_w):
-#     with open(f'/home/user01/data/talha/CMED/preds/{filename}.txt', 'w') as f:
-#         for class_name, confidence, box in zip(classes, confidences, boxes):
-#             x_min, y_min, x_max, y_max = box
-#             f.write(f'{class_name} {np.round(confidence, 5)} {int(x_min*orig_w)} {int(y_min*orig_h)} {int(x_max*orig_w)} {int(y_max*orig_h)}\n')
-
-
-# def write_eval_txt_files(preds, class_dict, filename, orig_h, orig_w):
-#     probs = preds.softmax(1).permute(0,2,3,1).cpu().numpy().squeeze()
-#     boxes, confidences, classes = get_segment_boxes_and_confidences(probs, class_dict)
-#     write_boxes_and_confidences_to_file(filename, boxes, confidences, classes, orig_h, orig_w)
-
-
-# import csv
-# import os
-
-# def write_boxes_and_confidences_to_file(preds, filename, class_dict):
-#     probs = preds.softmax(1).permute(0,2,3,1).cpu().numpy().squeeze()
-#     boxes, confidences, classes = get_segment_boxes_and_confidences(probs, class_dict)
-#     # Check if file exists, write headers only if it doesn't
-#     file_exists = os.path.isfile(f'/home/user01/data/talha/CMED/lcm_400x_test.csv')
+def make_onehot(seg_mask, num_classes):
+    # num_classes = 5#len(class_dict) + 1  # +1 for background class
     
-#     with open(f'/home/user01/data/talha/CMED/lcm_400x_test.csv', 'a', newline='') as f:
-#         writer = csv.writer(f)
-        
-#         if not file_exists:
-#             writer.writerow(["filename", "class_name", "confidence", "x_min", "y_min", "x_max", "y_max"]) # write header
-            
-#         for class_name, confidence, box in zip(classes, confidences, boxes):
-#             x_min, y_min, x_max, y_max = box
-#             writer.writerow([filename, class_name, confidence, x_min, y_min, x_max, y_max])
+    # Create an empty matrix for the one-hot encoded format
+    one_hot = np.zeros((seg_mask.shape[0], seg_mask.shape[1], num_classes))
+    
+    # Populate the matrix
+    for i in range(num_classes):
+        one_hot[:, :, i] = (seg_mask == i)
+        one_hot[:, :, i] = measure.label(one_hot[:, :, i], connectivity=1)
+    
+    # Shift all the channels up by one and put the 0th channel at the end
+    one_hot = one_hot[:, :, list(range(1, num_classes)) + [0]]
+    
+    return one_hot

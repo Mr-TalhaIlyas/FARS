@@ -1,6 +1,6 @@
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import QMainWindow
-from src.ui.splash_ui import Ui_Dialog as Splash_UI
+from map.ui.splash_ui import Ui_Dialog as Splash_UI
 
 
 class Splash_Dialog(QMainWindow, Splash_UI):

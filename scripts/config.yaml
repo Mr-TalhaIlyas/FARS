@@ -9,7 +9,7 @@ sanity_check: False
 
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'Same_losvaz_slowDisc2_mfda5_400x'
+experiment_name: 'Same_losvazAllT_slowDisc2_mfda5_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -39,7 +39,7 @@ input_channels: 3
 label_smoothing: 0.0
 batch_size: 4
 WEIGHT_DECAY: 0.00005
-AUX_LOSS_Weights: 0.7
+AUX_LOSS_Weights: 0.4
 LAMBDA_ADV_MAIN: 0.001
 LAMBDA_ADV_AUX: 0.0002
 # only for training data
@@ -66,8 +66,8 @@ learning_rate: 0.001
 learning_rate_d: 0.00001
 lr_schedule: 'cos'
 lr_schedule_d: 'poly'
-epochs: 400 
-warmup_epochs: 2
+epochs: 200 
+warmup_epochs: 1
 # one of 'batch_norm' or 'sync_bn' or 'layer_norm'
 norm_typ: 'sync_bn'
 BN_MOM: 0.9
