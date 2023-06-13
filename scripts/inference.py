@@ -106,7 +106,7 @@ elif config['use_model'] == 'DeepLab':
 model = model.to('cuda' if torch.cuda.is_available() else 'cpu')
 mu = ModelUtils(config['num_classes'], config['checkpoint_path'], config['experiment_name'])
 # mu.load_chkpt(model)
-mu.load_pretrained_chkpt(model, f'/home/user01/data/talha/CMED/chkpts/{config["experiment_name"]}.pth')
+mu.load_pretrained_chkpt(model, f'{config["checkpoint_path"]}/{config["experiment_name"]}.pth')
 #%%
 ###########################
 #  EVALUATION on Target

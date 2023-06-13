@@ -233,8 +233,6 @@ class AdvTrain(object):
         lbl_batch = torch_resizer(masks_transform(src_batch['lbl']))
         
         # we will transfer HCM stains texture to LCM stains.
-        # timg_batch = self.da.apply_fda(timg_batch, simg_batch)
-        # simg_batch = self.da.apply_fda(simg_batch, timg_batch)
         if np.random.randint(0, 100) % 2 == 0: # randomly when even
             simg_batch = self.da.apply_fda(simg_batch, timg_batch)
         else: # when odd

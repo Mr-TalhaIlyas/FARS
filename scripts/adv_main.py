@@ -107,10 +107,11 @@ if config['sanity_check']:
                                , border=(255,0,0)))
 #%%
 model = MaxViT_OCR(num_classes=config['num_classes'], in_channnels=3, embed_dims=config['embed_dims'],
-                ffn_ratios=config['ffn_ratios'], depths=config['depths'], num_stages=4,
-                dec_outChannels=config['dec_channels'], ls_init_val=float(config['layer_scaling_val']), 
-                drop_path=float(config['stochastic_drop_path']), drop_path_mode=config['SD_mode'],
-                config=config)
+                   ffn_ratios=config['ffn_ratios'], depths=config['depths'], num_stages=4,
+                   dec_outChannels=config['dec_channels'], ls_init_val=float(
+                       config['layer_scaling_val']),
+                   drop_path=float(config['stochastic_drop_path']), drop_path_mode=config['SD_mode'],
+                   config=config)
 disc = Discriminator(inChannel=config['num_classes']) 
 aux_disc = Discriminator(inChannel=config['num_classes'])
                 

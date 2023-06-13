@@ -9,7 +9,7 @@ sanity_check: False
 
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'Same_losvazAllT_slowDisc2_mfda5_400x'
+experiment_name: 'Same_losvazAllT_slowDisc2_mfda5_1000x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -17,8 +17,8 @@ use_ocr: True
 
 # Data loader parameters
 
-src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/400x/"
-trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/400x/"
+src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/1000x/"
+trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/1000x/"
 
 # add sub dirs inside of train/val and test
 sub_directories: ['images/', 'labels/']
@@ -39,7 +39,7 @@ input_channels: 3
 label_smoothing: 0.0
 batch_size: 4
 WEIGHT_DECAY: 0.00005
-AUX_LOSS_Weights: 0.4
+AUX_LOSS_Weights: 0.49
 LAMBDA_ADV_MAIN: 0.001
 LAMBDA_ADV_AUX: 0.0002
 # only for training data

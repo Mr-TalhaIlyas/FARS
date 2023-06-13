@@ -12,3 +12,4 @@ out/
 *.jpeg
 *.pyc
 *.txt
+*.npy
