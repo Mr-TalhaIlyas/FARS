@@ -25,6 +25,7 @@ def extract_ampl_phase(fft_im):
     # fft_im: size should be b x 3 x h x w
     fft_amp = torch.abs(fft_im)
     fft_pha = torch.angle(fft_im)
+    # print(fft_amp.shape, fft_pha.shape, fft_im.shape)
     return fft_amp, fft_pha
 
 
@@ -63,7 +64,10 @@ def FDA_source_to_target(src_img, trg_img, L=0.1):
     _, _, imgH, imgW = src_img.size()
     src_in_trg = torch.fft.irfft2(fft_src_, dim=(-2, -1), s=[imgH, imgW])
 
-    return src_in_trg
+    op = {'amp_src': amp_src, 'pha_src': pha_src,
+          'amp_trg': amp_trg, 'pha_trg': pha_trg}
+
+    return src_in_trg#, op
 
 scale = lambda x, alpha, beta: (((beta-alpha) * (x-torch.min(x))) / (torch.max(x)-torch.min(x))) + alpha
 
@@ -76,7 +80,7 @@ def FDA(im_src, im_trg, L=0.001, space='ycrcb', scale_back=True):
         im_src = rgb2ycc(im_src)
         im_trg = rgb2ycc(im_trg)
     
-    src_in_trg = FDA_source_to_target( im_src, im_trg, L=L)
+    src_in_trg, op = FDA_source_to_target( im_src, im_trg, L=L)
     
     if space=='ycrcb':
         src_in_trg = ycc2rgb(src_in_trg)
@@ -84,7 +88,7 @@ def FDA(im_src, im_trg, L=0.001, space='ycrcb', scale_back=True):
     if scale_back:
         src_in_trg = scale(src_in_trg, alpha=0, beta=1)
     
-    return src_in_trg
+    return src_in_trg#, op
 
 class DomainAdapter:
     def __init__(self, L=0.01, space='ycrcb'):
@@ -94,16 +98,16 @@ class DomainAdapter:
 
     def identity(self, src_batch, trg_batch):
         # just pass through
-        return src_batch
+        return src_batch#, trg_batch
     
     def domainadapt(self, src_batch, trg_batch):
         for i in range(len(src_batch)):
-            src_batch[i:i+1, ...] = FDA(src_batch[i:i+1, ...], trg_batch[i:i+1, ...],
+            src_batch[i:i+1, ...], op = FDA(src_batch[i:i+1, ...], trg_batch[i:i+1, ...],
                                         L=self.L, space=self.space)
             # FFT changes the pixel values so scale them back between 0 and 1.
             src_batch[i:i+1, ...] = self.scale(src_batch[i:i+1, ...], alpha=0, beta=1)
         
-        return src_batch
+        return src_batch#, op
     
     def apply_fda(self, src_batch, trg_batch):
         func_args = [
@@ -115,4 +119,30 @@ class DomainAdapter:
         
         src_batch = func(*args)
         
-        return src_batch
+        return src_batch#, op
+
+def get_full_fft_amp(amp_src):
+    full_amp = np.zeros((512, 512))
+
+    # Copy the positive frequency terms to the first half of the array
+    full_amp[:, :257] = amp_src
+
+    # Reflect the positive frequency terms to create the negative frequency terms
+    full_amp[:, 257:] = amp_src[:, -2:0:-1]
+
+    # Perform an FFT shift to center the low-frequency components
+    full_amp_shifted = np.fft.fftshift(full_amp)
+    return np.log1p(full_amp_shifted)
+
+def get_full_fft_pha(fft_pha_np):
+    full_pha = np.zeros((512, 512))
+
+    # Copy the positive frequency terms to the first half of the array
+    full_pha[:, :257] = fft_pha_np
+
+    # Reflect the positive frequency terms to create the negative frequency terms
+    full_pha[:, 257:] = -fft_pha_np[:, -2:0:-1]
+
+    # Perform an FFT shift to center the low-frequency components
+    full_pha_shifted = np.fft.fftshift(full_pha)
+    return full_pha_shifted

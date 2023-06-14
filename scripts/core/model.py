@@ -228,7 +228,7 @@ class MaxViT_OCR(nn.Module):
         # define loss here for balance load accross GPUs
         self.criterion = FocalLoss(gamma=5)
         self.aux_criterion = nn.CrossEntropyLoss(ignore_index=-100)
-        # self.aux_criterion = LovaszSoftmax(classes='present', per_image=False)
+        self.lovasz = LovaszSoftmax()
 
     def forward(self, x, target=None):
 
@@ -238,8 +238,8 @@ class MaxViT_OCR(nn.Module):
         # aux_feats = self.ocr.ocr_aux_feats
 
         if self.training and target is not None:
-            loss = self.criterion(output, target)
-            aux_loss = self.aux_criterion(aux_out, target)
+            loss = self.criterion(output, target) + self.lovasz(output, target)*0.5
+            aux_loss = self.aux_criterion(aux_out, target) 
             return {'loss' : loss, 'aux_loss' : aux_loss}, \
                    {'out' : output, 'aux_out' : aux_out} 
         else:

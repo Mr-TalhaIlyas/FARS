@@ -60,15 +60,16 @@ trg_train_paths, _, trg_test_paths = trg_data_lists.get_splits()
 trg_data_lists.get_filecounts()
 
 train_data = CWD26(src_train_paths[0], src_train_paths[1], config['img_height'], config['img_width'],
-                       config['Augment_data'], config['Normalize_data'])
+                   config['Augment_data'], config['Normalize_data'])
 
 train_loader = DataLoader(train_data, batch_size=config['batch_size'], shuffle=True,
-                          num_workers=config['num_workers'], drop_last=True, # important for adaptive augmentation to work properly.
+                          # important for adaptive augmentation to work properly.
+                          num_workers=config['num_workers'], drop_last=True,
                           collate_fn=collate, pin_memory=config['pin_memory'],
                           prefetch_factor=3, persistent_workers=True)
 
 val_data = CWD26(src_val_paths[0], src_val_paths[1], config['img_height'], config['img_width'],
-                     False, config['Normalize_data'])
+                 False, config['Normalize_data'])
 
 val_loader = DataLoader(val_data, batch_size=config['batch_size'], shuffle=True,
                         num_workers=config['num_workers'], drop_last=True,
@@ -76,20 +77,20 @@ val_loader = DataLoader(val_data, batch_size=config['batch_size'], shuffle=True,
                         prefetch_factor=3, persistent_workers=True)
 
 trg_train_data = CWD26(trg_train_paths[0], trg_train_paths[1], config['img_height'], config['img_width'],
-                     False, config['Normalize_data'])
+                       config['Augment_data'], config['Normalize_data'])
 
 trg_train_loader = DataLoader(trg_train_data, batch_size=config['batch_size'], shuffle=True,
-                        num_workers=config['num_workers'], drop_last=True,
-                        collate_fn=collate, pin_memory=config['pin_memory'],
-                        prefetch_factor=3, persistent_workers=True)
+                              num_workers=config['num_workers'], drop_last=True,
+                              collate_fn=collate, pin_memory=config['pin_memory'],
+                              prefetch_factor=3, persistent_workers=True)
 
 trg_test_data = CWD26(trg_test_paths[0], trg_test_paths[1], config['img_height'], config['img_width'],
-                     False, config['Normalize_data'])
+                      False, config['Normalize_data'])
 
 trg_test_loader = DataLoader(trg_test_data, batch_size=config['batch_size'], shuffle=True,
-                        num_workers=config['num_workers'], drop_last=True,
-                        collate_fn=collate, pin_memory=config['pin_memory'],
-                        prefetch_factor=3, persistent_workers=True)
+                             num_workers=config['num_workers'], drop_last=True,
+                             collate_fn=collate, pin_memory=config['pin_memory'],
+                             prefetch_factor=3, persistent_workers=True)
 if config['sanity_check']:
     # DataLoader Sanity Checks
     batch = next(iter(train_loader))

@@ -74,11 +74,14 @@ Noise = iaa.Sequential(
             iaa.OneOf(
                 [   
                 # Blur each image using a median over neihbourhoods that have a random size between 3x3 and 7x7
-                sometimes(iaa.MedianBlur(k=(3, 7))),
+                sometimes(iaa.MedianBlur(k=(3, 11))),
                 # blur images using gaussian kernels with random value (sigma) from the interval [a, b]
-                sometimes(iaa.GaussianBlur(sigma=(0.0, 1.0))),
-                sometimes(iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5)),
-                sometimes(iaa.ChannelShuffle(p=0.9))
+                sometimes(iaa.GaussianBlur(sigma=(1.0, 3.0))), # 0 to 1
+                sometimes(iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 15), per_channel=0.5)),
+                sometimes(iaa.ChannelShuffle(p=0.999)),
+                # new added
+                sometimes(iaa.MotionBlur(k=15, angle=[-45, 45])),
+                sometimes(iaa.MedianBlur(k=(3, 11))),
                 ]
             ),
             iaa.Sequential(

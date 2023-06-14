@@ -85,7 +85,7 @@ mu = ModelUtils(config['num_classes'], config['checkpoint_path'], config['experi
 mu.load_pretrained_chkpt(model, f'{config["checkpoint_path"]}/{config["experiment_name"]}.pth')
 
 #%%
-meg = config['meg']
+# meg = config['meg']
 
 magnifications = ['100x/', '400x/', '1000x/']
 for meg in magnifications:
@@ -211,9 +211,9 @@ for meg in magnifications:
 
     print(f'chkpt loaded: {config["experiment_name"]}\nimages dir: {dir_imgs}\ngt dir: {dir_gts}\ndet dir: {dir_dets}\n')
 
-    print(f'Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
-    print(f'mean Panoptic Quality mPQ = {float(pq[0][1]):0.5f}\n')
-    print(f'binary Panoptic Quality bPQ = {float(pq[0][2]):0.5f}\n')
+    print(f'[OUTPUT] Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
+    print(f'[OUTPUT] mean Panoptic Quality mPQ = {float(pq[0][1]):0.5f}\n')
+    print(f'[OUTPUT] binary Panoptic Quality bPQ = {float(pq[0][2]):0.5f}\n')
 
     if config['coco_metrics']:
         print('COCO Metrics')
