@@ -16,7 +16,7 @@ checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
 use_ocr: True
 
 # Data loader parameters
-
+# Fixed
 src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/1000x/"
 trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/1000x/"
 

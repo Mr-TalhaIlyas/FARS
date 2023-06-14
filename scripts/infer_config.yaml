@@ -5,12 +5,12 @@
 gpus_to_use: '0'
 DPI: 300
 LOG_WANDB:  False
-sanity_check: True
+sanity_check: False
 
 use_model: 'proposed'
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'Same_losvazAllT_slowDisc2_mfda5_1000x'
+experiment_name: 'Same_losvaz_slowDisc2_mfda5_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -20,14 +20,15 @@ use_ocr: True
 # the model is trained on HCM and tested on LCM, so trg machine in actually the test data.
 trg_machine: 'LCM'
 # select magnification for testing 
-meg: '1000x'
+meg: '400x'
 split: 'test'
 iou_threshold: 0.5
 # Data loader parameters
 data_dir: "/home/user01/data/talha/CMED/dataset/"
 
 # original annotaions provided by the paper to reconstructed ones i.e., blobs to boxes.
-orig_annotations: False
+orig_annotations: True
+coco_metrics: False
 # src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/400x/"
 # trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/400x/"
 

@@ -28,7 +28,7 @@ import imgviz, cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-from tqdm import tqdm
+from tqdm.auto import tqdm
 mpl.rcParams['figure.dpi'] = 300
 
 from data.dataloader import GEN_DATA_LISTS, CWD26
@@ -65,30 +65,6 @@ emp = EMPatches()
 class_dict = {'ring': 1, 'trophozoite':2, 'schizont':3, 'gametocyte':4}
 slides = 'blood-smear-slides'
 
-meg = config['meg']
-
-data_dir = Path(config['data_dir'], config['trg_machine'], meg)
-
-seg2bbox = Segmentation2Bbox(class_dict, config['predictions_dir'], config['trg_machine'], meg)
-
-img_paths, lbl_paths = get_data_paths(data_dir)
-test_loader = get_data_loaders(data_dir)
-
-if config['sanity_check']:
-    # DataLoader Sanity Checks
-    batch = next(iter(test_loader))
-    s=255
-    if config['batch_size'] > 1:
-        img_ls = []
-        [img_ls.append((batch['img'][i]*s).astype(np.uint8)) for i in range(config['batch_size'])]
-        [img_ls.append(g2c(batch['lbl'][i])) for i in range(config['batch_size'])]
-        plt.title('Sample Batch')
-        plt.imshow(imgviz.tile(img_ls, shape=(4,config['batch_size']//2), border=(255,0,0)))
-        plt.axis('off')
-    else:
-        plt.title('Sample Batch')
-        plt.imshow(imgviz.tile([(batch['img'][0]*s).astype(np.uint8), g2c(batch['lbl'][0])]
-                               , border=(255,0,0)))
 #%%
 
 if config['use_model'] == 'proposed':
@@ -107,107 +83,142 @@ model = model.to('cuda' if torch.cuda.is_available() else 'cpu')
 mu = ModelUtils(config['num_classes'], config['checkpoint_path'], config['experiment_name'])
 # mu.load_chkpt(model)
 mu.load_pretrained_chkpt(model, f'{config["checkpoint_path"]}/{config["experiment_name"]}.pth')
+
 #%%
-###########################
-#  EVALUATION on Target
-###########################
+meg = config['meg']
 
-metric = ConfusionMatrix(config['num_classes'])
+magnifications = ['100x/', '400x/', '1000x/']
+for meg in magnifications:
 
-# magnifications = ['400x/']#['100x/', '400x/', '1000x/']
-# for meg in magnifications:
-avg = []
-op = np.zeros((len(img_paths), 128, 128, 5))
-orig = np.zeros((len(img_paths), 128, 128, 5))
-types = []
+    data_dir = Path(config['data_dir'], config['trg_machine'], meg)
 
-model.eval()
+    seg2bbox = Segmentation2Bbox(class_dict, config['predictions_dir'], config['trg_machine'], meg)
 
-i = 0
-for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
+    img_paths, lbl_paths = get_data_paths(data_dir)
 
-    img, lbl, orig_h, orig_w, filename = inference_loader(img_path, lbl_path)
-    img_batch = images_transform([img])
-    lbl_batch = torch_resizer(masks_transform([lbl]))
+    if config['sanity_check']:
+        test_loader = get_data_loaders(data_dir)
+        # DataLoader Sanity Checks
+        batch = next(iter(test_loader))
+        s=255
+        if config['batch_size'] > 1:
+            img_ls = []
+            [img_ls.append((batch['img'][i]*s).astype(np.uint8)) for i in range(config['batch_size'])]
+            [img_ls.append(g2c(batch['lbl'][i])) for i in range(config['batch_size'])]
+            plt.title('Sample Batch')
+            plt.imshow(imgviz.tile(img_ls, shape=(4,config['batch_size']//2), border=(255,0,0)))
+            plt.axis('off')
+        else:
+            plt.title('Sample Batch')
+            plt.imshow(imgviz.tile([(batch['img'][0]*s).astype(np.uint8), g2c(batch['lbl'][0])]
+                                , border=(255,0,0)))
 
-    with torch.no_grad():
+    ###########################
+    #  EVALUATION on Target
+    ###########################
+
+    metric = ConfusionMatrix(config['num_classes'])
+
+    avg = []
+    op = np.zeros((len(img_paths), 128, 128, 5))
+    orig = np.zeros((len(img_paths), 128, 128, 5))
+    types = []
+
+    model.eval()
+
+    i = 0
+    # print('Generating predictions...\n')
+    for img_path, lbl_path in tqdm(zip(img_paths, lbl_paths), total=len(img_paths)):
+    # for img_path, lbl_path in zip(img_paths, lbl_paths):
+
+        img, lbl, orig_h, orig_w, filename = inference_loader(img_path, lbl_path)
+        img_batch = images_transform([img])
+        lbl_batch = torch_resizer(masks_transform([lbl]))
+
+        with torch.no_grad():
+            if config['use_model'] == 'proposed':
+                _, preds = model.forward(img_batch) # UHD_OCR
+            elif config['use_model'] == 'PSP':
+                preds, _ = model.forward(img_batch) # PSP
+            elif config['use_model'] == 'DeepLab':
+                preds = model.forward(img_batch) # Deep Lab
+                
         if config['use_model'] == 'proposed':
-            _, preds = model.forward(img_batch) # UHD_OCR
-        elif config['use_model'] == 'PSP':
-            preds, _ = model.forward(img_batch) # PSP
-        elif config['use_model'] == 'DeepLab':
-            preds = model.forward(img_batch) # Deep Lab
-            
-    if config['use_model'] == 'proposed':
-        preds = preds['out'] # UHD_OCR
+            preds = preds['out'] # UHD_OCR
 
-    seg2bbox.write_eval_txt_files(preds.clone(), filename, orig_h, orig_w)
+        seg2bbox.write_eval_txt_files(preds.clone(), filename, orig_h, orig_w)
 
-    preds = preds.argmax(1)
-    preds = preds.cpu().numpy()
-    lbl_batch = lbl_batch.cpu().numpy()
+        preds = preds.argmax(1)
+        preds = preds.cpu().numpy()
+        lbl_batch = lbl_batch.cpu().numpy()
 
-    metric.update(lbl_batch, preds)
-    iou = metric.get_scores()
-    metric.reset()
-    avg.append(iou['iou_mean'])
-    # PQ array writing  
-    op[i, ...] = make_onehot(preds.squeeze().astype(np.uint8), config['num_classes'])
-    orig[i, ...] = make_onehot(lbl_batch.squeeze().astype(np.uint8), config['num_classes'])
-    types.append(slides)
-    i += 1
-    
-avg = np.array(avg)
-avg[avg==0.0] = np.nan
+        metric.update(lbl_batch, preds)
+        iou = metric.get_scores()
+        metric.reset()
+        avg.append(iou['iou_mean'])
+        # PQ array writing  
+        op[i, ...] = make_onehot(preds.squeeze().astype(np.uint8), config['num_classes'])
+        orig[i, ...] = make_onehot(lbl_batch.squeeze().astype(np.uint8), config['num_classes'])
+        types.append(slides)
+        i += 1
+        
+    avg = np.array(avg)
+    avg[avg==0.0] = np.nan
 
-###########################
-#  CALCULATE mPQ/bPQ
-###########################
+    ###########################
+    #  CALCULATE mPQ/bPQ
+    ###########################
 
-print('Saving Output Arrays')
-os.makedirs(Path(config['predictions_dir'],'PQ'), exist_ok=True)
-np.save(Path(config['predictions_dir'],'PQ', 'preds.npy'), op) # cnns predictions
-np.save(Path(config['predictions_dir'],'PQ', 'gts.npy'), orig) # ground truths
-np.save(Path(config['predictions_dir'],'PQ','types.npy'), np.asarray(types)) # tumor tissue types
-print('Done Saving Arrays')
+    print('Saving Output Arrays')
+    os.makedirs(Path(config['predictions_dir'],'PQ'), exist_ok=True)
+    np.save(Path(config['predictions_dir'],'PQ', 'preds.npy'), op) # cnns predictions
+    np.save(Path(config['predictions_dir'],'PQ', 'gts.npy'), orig) # ground truths
+    np.save(Path(config['predictions_dir'],'PQ','types.npy'), np.asarray(types)) # tumor tissue types
+    print('Done Saving Arrays')
 
-get_pq(Path(config['predictions_dir'],'PQ'), config['iou_threshold'])
+    pq, _ = get_pq(Path(config['predictions_dir'],'PQ'), config['iou_threshold'])
 
-###########################
-#  CALCULATE mAP
-###########################
+    ###########################
+    #  CALCULATE mAP
+    ###########################
 
-# DEFINE GROUNDTRUTHS AND DETECTIONS
-dir_imgs = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'images')
-dir_gts = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'xmls')
-if config['orig_annotations']:
-    dir_gts = Path(config['data_dir'], 'Annotations', config['trg_machine'], config['split'], meg)
-dir_dets = Path(config['predictions_dir'], config['trg_machine'], meg)
+    # DEFINE GROUNDTRUTHS AND DETECTIONS
+    dir_imgs = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'images')
+    dir_gts = Path(config['data_dir'], config['trg_machine'], meg, config['split'], 'xmls')
+    if config['orig_annotations']:
+        dir_gts = Path(config['data_dir'], 'Annotations', config['trg_machine'], config['split'], meg)
+    dir_dets = Path(config['predictions_dir'], config['trg_machine'], meg)
 
-# Get annotations (ground truth and detections)
-gt_bbs = converter.vocpascal2bb(dir_gts)
-det_bbs = converter.text2bb(dir_dets, bb_type=BBType.DETECTED, bb_format=BBFormat.XYX2Y2,
-                            type_coordinates=CoordinatesType.ABSOLUTE, img_dir=dir_imgs)
+    # Get annotations (ground truth and detections)
+    gt_bbs = converter.vocpascal2bb(dir_gts)
+    det_bbs = converter.text2bb(dir_dets, bb_type=BBType.DETECTED, bb_format=BBFormat.XYX2Y2,
+                                type_coordinates=CoordinatesType.ABSOLUTE, img_dir=dir_imgs)
 
-# EVALUATE WITH COCO METRICS
-coco_res1 = coco_evaluator.get_coco_summary(gt_bbs, det_bbs)
-# coco_res2 = coco_evaluator.get_coco_metrics(gt_bbs, det_bbs)
+    # EVALUATE WITH COCO METRICS
+    coco_res1 = coco_evaluator.get_coco_summary(gt_bbs, det_bbs)
+    # coco_res2 = coco_evaluator.get_coco_metrics(gt_bbs, det_bbs)
 
-# EVALUATE WITH VOC PASCAL METRICS
-iou = config['iou_threshold']
-dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(
-    gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
+    # EVALUATE WITH VOC PASCAL METRICS
+    iou = config['iou_threshold']
+    dict_res = pascal_voc_evaluator.get_pascalvoc_metrics(
+        gt_bbs, det_bbs, iou, generate_table=True, method=MethodAveragePrecision.ELEVEN_POINT_INTERPOLATION)
 
+    # IOU metric is not working properly
+    # print(30*'/')
+    # print(f'Avg IoU: {np.nanmean(avg)}\n')
 
-print(30*'/')
-print(f'Avg IoU: {np.nanmean(avg)}\n')
-print(30*'/')
-print(f'Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
-print(30*'/')
-print('COCO Metrics')
-print(tabulate(coco_res1.items(), headers=["Key", "Value"], tablefmt="github", floatfmt=".5f"))
+    print(60*'/')
 
-print(30*'/')
-print(f'{dir_imgs}\n{dir_gts}\n{dir_dets}\n')
+    print(f'chkpt loaded: {config["experiment_name"]}\nimages dir: {dir_imgs}\ngt dir: {dir_gts}\ndet dir: {dir_dets}\n')
+
+    print(f'Pascal VOC mAP = {dict_res["mAP"]:0.5f}\n')
+    print(f'mean Panoptic Quality mPQ = {float(pq[0][1]):0.5f}\n')
+    print(f'binary Panoptic Quality bPQ = {float(pq[0][2]):0.5f}\n')
+
+    if config['coco_metrics']:
+        print('COCO Metrics')
+        print(tabulate(coco_res1.items(), headers=["Key", "Value"], tablefmt="github", floatfmt=".5f"))
+
+    print(60*'/')
 #%%
 

@@ -39,6 +39,8 @@ def get_pq(pred_path, iou_thresh=0.5):
     # instead of simple range i added trange to see progress
     # loop over the images
     for i in trange(true.shape[0], desc='Evaluating'):
+    # print('Evaluating PQ...\n')
+    # for i in range(true.shape[0]):
         pq = []
         pred_bin = binarize(pred[i,:,:,:4])
         true_bin = binarize(true[i,:,:,:4])
@@ -77,17 +79,18 @@ def get_pq(pred_path, iou_thresh=0.5):
     schi_PQ = np.nanmean([pq[2] for pq in mPQ_all])
     game_PQ = np.nanmean([pq[3] for pq in mPQ_all])
     
-    print('%'*40)
-    print('Printing calculated metrics on a single split')
-    print('%'*40)
+    # print('%'*40)
+    # print('Printing calculated metrics on a single split')
+    # print('%'*40)
     nuclei_type = ['Ring', 'Trophozoite', 'Schizont', 'Gametocyte']
     nuclei_type_pq = np.array([ring_PQ, trop_PQ, schi_PQ, game_PQ])
     
     nuclei_result = np.concatenate((np.asarray(nuclei_type).reshape(-1,1), \
                                     np.round(np.asarray(nuclei_type_pq).reshape(-1,1),4)), 1)
         
-    print(tabulate(np.ndarray.tolist(nuclei_result), headers = ["Nuclei Type", "PQ"], tablefmt="github"))
-    print('%'*40)
+    # print(tabulate(np.ndarray.tolist(nuclei_result), headers = ["Nuclei Type", "PQ"], tablefmt="github"))
+    # print('%'*40)
+
     # Save per-class metrics as a csv file
     # for_dataframe = {'Class Name': ['Ring', 'Trophozoite', 'Schizont', 'Gametocyte'],
     #                     'PQ': [ring_PQ, trop_PQ, schi_PQ, game_PQ]}
@@ -120,8 +123,9 @@ def get_pq(pred_path, iou_thresh=0.5):
                              np.round(np.asarray(mPQ).reshape(-1,1), 4), \
                              np.round(np.asarray(bPQ).reshape(-1,1),4)), 1)
         
-    print(tabulate(np.ndarray.tolist(result), headers = ["Tissue Type", "mPQ", "bPQ"], tablefmt="github"))
+    # print(tabulate(np.ndarray.tolist(result), headers = ["Tissue Type", "mPQ", "bPQ"], tablefmt="github"))
 
+    return np.ndarray.tolist(result), np.ndarray.tolist(nuclei_result)
 # #####
 # if __name__ == '__main__':
 #     args = docopt.docopt(__doc__, version='PanNuke Evaluation v1.0')
