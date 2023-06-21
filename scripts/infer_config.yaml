@@ -10,7 +10,7 @@ sanity_check: False
 use_model: 'proposed'
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_1000x'
+experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_Augv2_CELVF_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -18,7 +18,7 @@ predictions_dir: "/home/user01/data/talha/CMED/preds/"
 use_ocr: True
 
 # the model is trained on HCM and tested on LCM, so trg machine in actually the test data.
-trg_machine: 'LCM'
+trg_machine: 'HCM'
 # select magnification for testing 
 # meg: '400x'
 split: 'test'

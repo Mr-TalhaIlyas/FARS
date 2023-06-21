@@ -80,7 +80,7 @@ def FDA(im_src, im_trg, L=0.001, space='ycrcb', scale_back=True):
         im_src = rgb2ycc(im_src)
         im_trg = rgb2ycc(im_trg)
     
-    src_in_trg, op = FDA_source_to_target( im_src, im_trg, L=L)
+    src_in_trg = FDA_source_to_target( im_src, im_trg, L=L)
     
     if space=='ycrcb':
         src_in_trg = ycc2rgb(src_in_trg)
@@ -102,7 +102,7 @@ class DomainAdapter:
     
     def domainadapt(self, src_batch, trg_batch):
         for i in range(len(src_batch)):
-            src_batch[i:i+1, ...], op = FDA(src_batch[i:i+1, ...], trg_batch[i:i+1, ...],
+            src_batch[i:i+1, ...] = FDA(src_batch[i:i+1, ...], trg_batch[i:i+1, ...],
                                         L=self.L, space=self.space)
             # FFT changes the pixel values so scale them back between 0 and 1.
             src_batch[i:i+1, ...] = self.scale(src_batch[i:i+1, ...], alpha=0, beta=1)
@@ -122,6 +122,7 @@ class DomainAdapter:
         return src_batch#, op
 
 def get_full_fft_amp(amp_src):
+    print('Assuming image size to be 512x512 else modify the code')
     full_amp = np.zeros((512, 512))
 
     # Copy the positive frequency terms to the first half of the array
@@ -135,6 +136,7 @@ def get_full_fft_amp(amp_src):
     return np.log1p(full_amp_shifted)
 
 def get_full_fft_pha(fft_pha_np):
+    print('Assuming image size to be 512x512 else modify the code')
     full_pha = np.zeros((512, 512))
 
     # Copy the positive frequency terms to the first half of the array

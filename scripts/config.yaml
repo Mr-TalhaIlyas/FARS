@@ -2,14 +2,14 @@
 # of crop and weed dataset
 
 #'0,1,2,3'
-gpus_to_use: '2'
+gpus_to_use: '3'
 DPI: 300
-LOG_WANDB:  False
+LOG_WANDB:  True
 sanity_check: False
 
 project_name: 'UDA_Malaria'
 #'#'bean_aug_advent_carbonnier_new_data'
-experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_Augv2_CELVF_1000x'
+experiment_name: 'MaxViT_OCR_pretrain_aug_adv_slowDisc_Augv2_CELVF_400x'
 
 log_directory: "/home/user01/data/talha/CMED/logs/"
 checkpoint_path: "/home/user01/data/talha/CMED/chkpts/"
@@ -17,8 +17,8 @@ use_ocr: True
 
 # Data loader parameters
 # Fixed
-src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/1000x/"
-trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/1000x/"
+src_data_dir: "/home/user01/data/talha/CMED/dataset/HCM/400x/"
+trg_data_dir: "/home/user01/data/talha/CMED/dataset/LCM/400x/"
 
 # add sub dirs inside of train/val and test
 sub_directories: ['images/', 'labels/']
