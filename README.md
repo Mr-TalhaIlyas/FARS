@@ -1,1 +1,1 @@
-# Cost Effective Malarial Detection
+# Fourier Adaptive Recognition System (FARS)
